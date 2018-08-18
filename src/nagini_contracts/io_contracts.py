@@ -54,6 +54,11 @@ T14 = TypeVar('T14')
 T15 = TypeVar('T15')
 
 
+def IOForall(domain: Type[T],
+             predicate: Callable[[T], bool]) -> bool:
+    pass
+
+
 class IOExists1(Generic[T1]):
     """``IOExists`` for defining 1 IO existential variable."""
 
@@ -428,6 +433,7 @@ def ctoken(t: Place) -> bool:
 
 
 __all__ = (
+    'IOForall',
     'IOExists1',
     'IOExists2',
     'IOExists3',

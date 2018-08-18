@@ -788,12 +788,14 @@ class Analyzer(ast.NodeVisitor):
         assert self.current_function
         name = construct_lambda_prefix(node.lineno, node.col_offset)
         self.current_scopes.append(name)
-        assert not self._aliases
+        old_aliases = dict(self._aliases)
         for arg in node.args.args:
             # For IO operation arguments, we want parameters to be primitive
             # b/c primitive equality is simpler than boxed reference equality,
             # and for simplicity we use the same policy for output params too.
             if self._is_io_existential:
+                if isinstance(node._parent, ast.Call):
+                    print("12")
                 arg_type = self.typeof(arg).try_unbox()
                 var = self.node_factory.create_python_io_existential_var(
                     arg.arg, arg, arg_type)
@@ -811,7 +813,7 @@ class Analyzer(ast.NodeVisitor):
         self._is_io_existential = False
         self.visit(node.body, node)
         self.current_scopes.pop()
-        self._aliases.clear()
+        self._aliases = old_aliases
 
     def visit_arg(self, node: ast.arg) -> None:
         assert self.current_function is not None

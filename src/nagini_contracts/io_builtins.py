@@ -166,8 +166,8 @@ def End(t_pre: Place) -> Place:
 @IOOperation
 def set_var_io(
         t_pre: Place,
-        value: int,
-        result: int = Result(),
+        value: object,
+        result: object = Result(),
         t_post: Place = Result()) -> bool:
     """Set variable given at ``result`` position to provided ``value``."""
     Terminates(True)
@@ -175,7 +175,7 @@ def set_var_io(
 
 @Ghost
 @ContractOnly
-def SetVar(t_pre: Place, value: int) -> Tuple[int, Place]:
+def SetVar(t_pre: Place, value: object) -> Tuple[object, Place]:
     """Perform ``set_var_io``.
 
     .. note::
@@ -183,7 +183,7 @@ def SetVar(t_pre: Place, value: int) -> Tuple[int, Place]:
         Mypy does not allow generics as function arguments. Therefore,
         we have to use a concrete type for ``value``.
     """
-    IOExists2(Place, int)(
+    IOExists2(Place, object)(
         lambda t_post, result: (
             Requires(
                 token(t_pre, 1) and

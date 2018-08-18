@@ -746,32 +746,43 @@ class ContractTranslator(CommonTranslator):
         if body_stmt:
             raise InvalidProgramException(node, 'purity.violated')
 
-        dom_stmt, lhs, is_trigger = self._create_quantifier_contains_expr(var.ref(),
-                                                                          domain_node,
-                                                                          ctx)
-        lhs = self.unwrap(lhs)
+        if node.func.id == 'Forall':
+            dom_stmt, lhs, is_trigger = self._create_quantifier_contains_expr(var.ref(),
+                                                                              domain_node,
+                                                                              ctx)
+            lhs = self.unwrap(lhs)
 
-        implication = self.viper.Implies(lhs, rhs, self.to_position(node, ctx),
-                                         self.no_info(ctx))
-        if is_trigger:
-            # Add lhs of the implication, which the user cannot write directly
-            # in this exact form.
-            # If we always do this, we apparently deactivate the automatically
-            # generated triggers and things are actually worse.
-            # Change: We always do this now.
-            try:
-                # Depending on the collection expression, this doesn't always
-                # work (malformed trigger); in that case, we just don't do it.
-                lhs_trigger = self.viper.Trigger([lhs], self.no_position(ctx),
-                                                 self.no_info(ctx))
-                triggers = [lhs_trigger] + triggers
-            except Exception:
-                pass
-        var_type_check = self.type_check(var.ref(), var.type,
-                                         self.no_position(ctx), ctx, False)
-        implication = self.viper.Implies(var_type_check, implication,
-                                         self.to_position(node, ctx),
-                                         self.no_info(ctx))
+            implication = self.viper.Implies(lhs, rhs, self.to_position(node, ctx),
+                                             self.no_info(ctx))
+            if is_trigger:
+                # Add lhs of the implication, which the user cannot write directly
+                # in this exact form.
+                # If we always do this, we apparently deactivate the automatically
+                # generated triggers and things are actually worse.
+                # Change: We always do this now.
+                try:
+                    # Depending on the collection expression, this doesn't always
+                    # work (malformed trigger); in that case, we just don't do it.
+                    lhs_trigger = self.viper.Trigger([lhs], self.no_position(ctx),
+                                                     self.no_info(ctx))
+                    triggers = [lhs_trigger] + triggers
+                except Exception:
+                    pass
+            var_type_check = self.type_check(var.ref(), var.type,
+                                             self.no_position(ctx), ctx, False)
+            implication = self.viper.Implies(var_type_check, implication,
+                                             self.to_position(node, ctx),
+                                             self.no_info(ctx))
+        else:
+            domain = self.get_target(node.args[0], ctx)
+            dom_stmt = []
+            assert isinstance(domain, PythonType)
+
+            var_type_check = self.type_check(var.ref(), domain,
+                                             self.no_position(ctx), ctx, False)
+            implication = self.viper.Implies(var_type_check, rhs,
+                                             self.to_position(node, ctx),
+                                             self.no_info(ctx))
         forall = self.viper.Forall(variables, triggers, implication,
                                    self.to_position(node, ctx),
                                    self.no_info(ctx))
@@ -857,7 +868,7 @@ class ContractTranslator(CommonTranslator):
             return self.translate_unfolding(node, ctx, impure)
         elif func_name == 'Low':
             return self.translate_low(node, ctx)
-        elif func_name == 'Forall':
+        elif func_name in ('Forall', 'IOForall'):
             return self.translate_forall(node, ctx, impure)
         elif func_name == 'Previous':
             return self.translate_previous(node, ctx)
