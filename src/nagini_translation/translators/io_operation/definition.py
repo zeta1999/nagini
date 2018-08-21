@@ -143,6 +143,19 @@ class IOOperationDefinitionTranslator(IOOperationCommonTranslator):
             for parameter in operation.get_parameters()
         ]
 
+        locals = [
+            v.decl
+            for v in operation._io_universals
+        ]
+
+        info = self.no_info(ctx)
+        pos = self.to_position(operation.get_termination_measure(), ctx)
+
+        local_type_assumptions = [
+            self.viper.Inhale(self.type_check(v.ref(), v.type, pos, ctx, False), pos, info)
+            for v in operation._io_universals
+        ]
+
         statement, termination_condition = self.translate_expr(
             operation.get_terminates(), ctx, target_type=self.viper.Bool)
         assert not statement
@@ -159,15 +172,12 @@ class IOOperationDefinitionTranslator(IOOperationCommonTranslator):
         else:
             checks = generator.create_checks(operation.get_body())
 
-        info = self.no_info(ctx)
-        position = self.to_position(operation.get_termination_measure(), ctx)
-
-        body = self.translate_block(checks, position, info)
+        body = self.translate_block(local_type_assumptions + checks, pos, info)
         pres = self._create_typeof_pres(operation.get_parameters(), ctx)
         ctx.current_function = None
         result = self.viper.Method(
             name=name, args=parameters, returns=[], pres=pres, posts=[],
-            locals=[], body=body, position=self.no_position(ctx), info=info)
+            locals=locals, body=body, position=self.no_position(ctx), info=info)
 
         return result
 

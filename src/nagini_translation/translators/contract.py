@@ -724,6 +724,9 @@ class ContractTranslator(CommonTranslator):
         lambda_prefix += '$'
         arg = lambda_.args.args[0]
         var = ctx.actual_function.get_variable(lambda_prefix + arg.arg)
+        if not var:
+            assert node.func.id == 'IOForall'
+            var = ctx.actual_function.get_variable(arg.arg)
         variables.append(var.decl)
 
         ctx.set_alias(arg.arg, var, None)

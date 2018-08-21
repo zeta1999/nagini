@@ -253,6 +253,8 @@ class IOOperationAnalyzer(ast.NodeVisitor):
                 node)
         assert self._current_io_operation.set_io_existentials(
             io_existential_creators)
+        self.visit(node.value.args[0].body)
+
 
     def visit_Call(self, node: ast.Call) -> None:
         """Parse IO operation properties.
@@ -288,12 +290,24 @@ class IOOperationAnalyzer(ast.NodeVisitor):
                         'duplicate_property',
                         node)
             else:
-                raise UnsupportedException(node,
-                                           'Unsupported property type.')
+                raise UnsupportedException(node, 'Unsupported property type.')
             self._in_property = True
             for arg in node.args:
                 self.visit(arg)
             self._in_property = False
+        elif isinstance(node.func, ast.Name) and node.func.id == 'IOForall':
+            operation = self._current_io_operation
+            assert len(node.args[1].args.args) == 1
+            arg_type = self._parent.get_target(node.args[0], operation.module)
+            lambda_ = node.args[1]
+            lambda_prefix = construct_lambda_prefix(lambda_.lineno,
+                                                    getattr(lambda_, 'col_offset',
+                                                            None))
+            lambda_prefix += '$'
+            for arg in lambda_.args.args:
+                var = self._node_factory.create_python_var(arg.arg, arg,
+                                                           arg_type)
+                operation._io_universals.append(var)
         else:
             for arg in node.args:
                 self.visit(arg)
