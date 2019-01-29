@@ -18,11 +18,14 @@ from nagini_translation.lib.constants import (
     ERROR_NAME,
     INTERNAL_NAMES,
     MODULE_VARS,
+    PMSET_TYPE,
     PRIMITIVE_INT_TYPE,
     PRIMITIVE_PREFIX,
     PRIMITIVE_SEQ_TYPE,
     PRIMITIVE_SET_TYPE,
     PRIMITIVES,
+    PSEQ_TYPE,
+    PSET_TYPE,
     RESULT_NAME,
     STRING_TYPE,
     VIPER_KEYWORDS,
@@ -256,7 +259,7 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
         if local_result is not None:
             return local_result
         for module in self.from_imports:
-            module_result = module.get_func_type(prefix)
+            module_result = module.get_func_type(path)
             if module_result is not None:
                 return module_result
         return None
@@ -502,7 +505,6 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
             assert self.types_match(field.type.try_box(), type.try_box())
         elif name in self.static_fields:
             field = self.static_fields[name]
-            assert self.types_match(field.type, type)
         else:
             field = self.node_factory.create_python_field(name, node,
                                                           type, self)
@@ -708,7 +710,11 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
                                                          CALLABLE_TYPE):
             boxed_name = self.name[len(PRIMITIVE_PREFIX):]
             if boxed_name == 'Set':
-                boxed_name = 'PSet'
+                boxed_name = PSET_TYPE
+            if boxed_name == 'Multiset':
+                boxed_name = PMSET_TYPE
+            if boxed_name == 'Seq':
+                boxed_name = PSEQ_TYPE
             return self.module.classes[boxed_name]
         return self
 
@@ -1004,6 +1010,8 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.declared_exceptions = OrderedDict()  # direct
         self.pure = pure
         self.predicate = False
+        self.all_low = False
+        self.preserves_low = False
         self.contract_only = contract_only
         self.interface = interface
         self.interface_name = None  # Name to be used in error messages, if different from
@@ -1027,7 +1035,6 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         Adds all dependencies needed when this method is called to the given set.
         """
         add_all_call_deps(self.call_deps, res, prefix)
-
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -1185,6 +1192,8 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         """
         dicts = [self.args,  self.special_args, self.locals, self.special_vars]
         return CombinedDict([], dicts)
+
+
 
 
 class PythonIOOperation(PythonNode, PythonScope, ContainerInterface):

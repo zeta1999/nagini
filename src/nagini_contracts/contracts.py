@@ -25,10 +25,11 @@ GHOST_PREFIX = "_gh_"
 CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant']
 
 CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall', 'IOForall',
-                  'Exists', 'Low', 'Acc', 'Rd', 'Fold', 'Unfold', 'Unfolding',
-                  'Previous', 'RaisedException', 'Sequence', 'PSet', 'ToSeq', 'MaySet',
-                  'MayCreate', 'getMethod', 'getArg', 'getOld', 'arg', 'Joinable',
-                  'MayStart', 'Let',]
+                  'Exists', 'Low', 'LowVal', 'LowEvent', 'Declassify', 'TerminatesSif',
+                  'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding', 'Previous',
+                  'RaisedException', 'PSeq', 'PSet', 'ToSeq', 'MaySet', 'MayCreate',
+                  'getMethod', 'getArg', 'getOld', 'arg', 'Joinable', 'MayStart', 'Let',
+                  'PMultiset',]
 
 T = TypeVar('T')
 V = TypeVar('V')
@@ -85,7 +86,7 @@ def Let(e1: T, t: Type[V], e2: Callable[[T], V]) -> V:
     """
     pass
 
-def Forall(domain: Iterable[T],
+def Forall(domain: Union[Iterable[T], Type[T]],
            predicate: Callable[[T], Union[bool, Tuple[bool, List[List[Any]]]]]) -> bool:
     """
     forall x in domain: predicate(x)
@@ -100,32 +101,54 @@ def Exists(domain: Iterable[T], predicate: Callable[[T], bool]) -> bool:
     pass
 
 
-def Low(*args) -> bool:
+def Low(expr: T) -> bool:
     """
     Predicate to indicate that an expression has to be *low*.
-
-    +    Calling with 0 args translates to ``!tl``.
-    +    Calling with 1 arg translates to ``!tl &amp;&amp; expr == expr_p``.
-    +    Ignored when not verifying information flow.
+    Ignored when not verifying information flow.
     """
     pass
 
-
-class Sequence(Generic[T], Sized, Iterable[T]):
+def LowVal(expr: T) -> bool:
     """
-    A Sequence[T] represents a pure sequence of instances of subtypes of T, and
+    Predicate to indicate that an expression has to be low, using value equality if the
+    expression is a primitive. Ignored when not verifying information flow.
+    """
+    pass
+
+def LowEvent() -> bool:
+    """
+    Predicate that states that either both executions reach this point or none of them.
+    """
+    pass
+
+def Declassify(expr: T) -> bool:
+    """
+    Declassify an expression. Assumes expression to be low.
+    """
+    pass
+
+def TerminatesSif(cond: bool, rank: int) -> bool:
+    """
+    Verify absence of termination channels. Gives surrounding loop/call a
+    termination condition and a ranking function.
+    """
+    pass
+
+class PSeq(Generic[T], Sized, Iterable[T]):
+    """
+    A PSeq[T] represents a pure sequence of instances of subtypes of T, and
     is translated to native Viper sequences.
     """
 
     def __init__(self, *args: T) -> None:
         """
-        ``Sequence(a, b, c)`` creates a Sequence instance containing the objects
+        ``PSeq(a, b, c)`` creates a PSeq instance containing the objects
         a, b and c in that order.
         """
 
     def __contains__(self, item: object) -> bool:
         """
-        True iff this Sequence contains the given object (not taking ``__eq__``
+        True iff this PSeq contains the given object (not taking ``__eq__``
         into account).
         """
 
@@ -136,29 +159,29 @@ class Sequence(Generic[T], Sized, Iterable[T]):
 
     def __len__(self) -> int:
         """
-        Returns the length of this Sequence.
+        Returns the length of this PSeq.
         """
 
-    def __add__(self, other: 'Sequence[T]') -> 'Sequence[T]':
+    def __add__(self, other: 'PSeq[T]') -> 'PSeq[T]':
         """
-        Concatenates two Sequences of the same type to get a new Sequence.
-        """
-
-    def take(self, until: int) -> 'Sequence[T]':
-        """
-        Returns a new Sequence of the same type containing all elements starting
-        from the beginning until the given index. ``Sequence(3,2,5,6).take(3)``
-        is equal to ``Sequence(3,2,5)``.
+        Concatenates two PSeqs of the same type to get a new PSeq.
         """
 
-    def drop(self, until: int) -> 'Sequence[T]':
+    def take(self, until: int) -> 'PSeq[T]':
         """
-        Returns a new Sequence of the same type containing all elements starting
+        Returns a new PSeq of the same type containing all elements starting
+        from the beginning until the given index. ``PSeq(3,2,5,6).take(3)``
+        is equal to ``PSeq(3,2,5)``.
+        """
+
+    def drop(self, until: int) -> 'PSeq[T]':
+        """
+        Returns a new PSeq of the same type containing all elements starting
         from the given index (i.e., drops all elements until that index).
-        ``Sequence(2,3,5,6).drop(2)`` is equal to ``Sequence(5,6)``.
+        ``PSeq(2,3,5,6).drop(2)`` is equal to ``PSeq(5,6)``.
         """
 
-    def update(self, index: int, new_val: T) -> 'Sequence[T]':
+    def update(self, index: int, new_val: T) -> 'PSeq[T]':
         """
         Returns a new sequence of the same type, containing the same elements
         except for the element at index ``index``, which is replaced by
@@ -167,9 +190,16 @@ class Sequence(Generic[T], Sized, Iterable[T]):
 
     def __iter__(self) -> Iterator[T]:
         """
-        Sequences can be quantified over; this is only here so that Sequences
+        PSeqs can be quantified over; this is only here so that PSeqs
         can be used as arguments for Forall.
         """
+
+def Previous(it: T) -> PSeq[T]:
+    """
+    Within the body of a loop 'for x in xs', Previous(x) represents the list of
+    the values of x in previous loop iterations.
+    """
+    pass
 
 
 class PSet(Generic[T], Sized, Iterable[T]):
@@ -211,20 +241,50 @@ class PSet(Generic[T], Sized, Iterable[T]):
         can be used as arguments for Forall.
         """
 
+class PMultiset(Generic[T], Sized, Iterable[T]):
+    """
+    An PMultiset[T] represents a pure multiset of instances of subtypes of T, and is translated to
+    native Viper multisets.
+    """
 
-def ToSeq(l: Iterable[T]) -> Sequence[T]:
+    def __init__(self, *args: T) -> None:
+        """
+        ``PMultiset(a, b, c)`` creates a multiset instance containing the objects
+        a, b and c.
+        """
+
+    def num(self, item: object) -> int:
+        """
+        Returns the number of occurrences of ``item`` in this multiset.
+        """
+
+    def __len__(self) -> int:
+        """
+        Returns the cardinality of this set.
+        """
+
+    def __add__(self, other: 'PMultiset[T]') -> 'PMultiset[T]':
+        """
+        Returns the union of this multiset and the other.
+        """
+
+    def __sub__(self, other: 'PMultiset[T]') -> 'PMultiset[T]':
+        """
+        Returns the difference between this multiset and the other,
+        """
+
+    def __iter__(self) -> Iterator[T]:
+        """
+        Multisets can be quantified over; this is only here so that multisets
+        can be used as arguments for Forall.
+        """
+
+
+def ToSeq(l: Iterable[T]) -> PSeq[T]:
     """
     Converts the given iterable of a built-in type (list, set, dict, range) to
-    a pure Sequence.
+    a pure PSeq.
     """
-
-
-def Previous(it: T) -> Sequence[T]:
-    """
-    Within the body of a loop 'for x in xs', Previous(x) represents the sequence of
-    the values of x in previous loop iterations.
-    """
-    pass
 
 
 # The following annotations have no runtime semantics. They are only used for
@@ -256,6 +316,26 @@ def MaySet(o: object, field_name: str) -> bool:
 def Rd(field) -> bool:
     """
     Read permission to a predicate or field, only to be used in pure contexts.
+    """
+    pass
+
+
+def ARP(counting: int = None) -> float:
+    """
+    Abstract read permission, only to be used in Acc(f, ...).
+    """
+    pass
+
+
+"""
+Permission used in predicates
+"""
+RD_PRED = 1  # type: float
+
+
+def Wildcard(field) -> bool:
+    """
+    Wildcard permission to a predicate or field, only to be used in pure contexts.
     """
     pass
 
@@ -295,14 +375,21 @@ def Ghost(func: T) -> T:
     """
     return func
 
-
-def NotPreservingTL(func: T) -> T:
+def AllLow(func: T) -> T:
     """
-    Decorator indicating that this method/function does not (necessarily)
-    preserve the timelevel.
+    Decorator indicating that everything this method does is low.
+    Requires all inputs to be low, ensures all state it has access to and
+    all return values are low.
     """
     return func
 
+def PreservesLow(func: T) -> T:
+    """
+    Decorator indicating that everything this method does preserves lowness.
+    Given that all the state it gets to work on is low to begin with, all state and
+    return values will remain low.
+    """
+    return func
 
 def ContractOnly(func: T) -> T:
     """
@@ -310,7 +397,7 @@ def ContractOnly(func: T) -> T:
     """
     return func
 
-    
+
 def GhostReturns(start_index: int) -> Callable[[T], T]:
     """
     Decorator for functions which specifies which return values are ghost
@@ -369,22 +456,31 @@ __all__ = [
         'Exists',
         'Let',
         'Low',
+        'LowVal',
+        'LowEvent',
+        'Declassify',
+        'TerminatesSif',
+        'AllLow',
+        'PreservesLow',
         'Acc',
         'Rd',
+        'ARP',
+        'RD_PRED',
+        'Wildcard',
         'Fold',
         'Unfold',
         'Unfolding',
         'Pure',
         'Predicate',
         'Ghost',
-        'NotPreservingTL',
         'ContractOnly',
         'GhostReturns',
         'list_pred',
         'dict_pred',
         'set_pred',
-        'Sequence',
+        'PSeq',
         'PSet',
+        'PMultiset',
         'ToSeq',
         'MaySet',
         'MayCreate',

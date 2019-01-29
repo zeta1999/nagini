@@ -5,13 +5,13 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import ast
-
 from collections import OrderedDict
+from typing import List, Set, Tuple
+
 from nagini_translation.lib.constants import (
     ARBITRARY_BOOL_FUNC,
     ASSERTING_FUNC,
     CHECK_DEFINED_FUNC,
-    COMBINE_NAME_FUNC,
     ERROR_NAME,
     FUNCTION_DOMAIN_NAME,
     GET_ARG_FUNC,
@@ -59,9 +59,10 @@ from nagini_translation.lib.typedefs import (
 from nagini_translation.lib.util import (
     InvalidProgramException,
 )
+from nagini_translation.sif.lib.viper_ast_extended import ViperASTExtended
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
-from typing import List, Set, Tuple
+
 
 class ProgramTranslator(CommonTranslator):
     def __init__(self, config: 'TranslatorConfig', jvm: 'JVM', source_file: str,
@@ -185,6 +186,15 @@ class ProgramTranslator(CommonTranslator):
                                    self.to_position(var.node, ctx),
                                    self.no_info(ctx))
 
+    def _create_inherit_check_postamble(self, stmts: List[Stmt], end_lbl: 'silver.ast.Label',
+                                        ctx: Context) -> None:
+        goto_end = self.viper.Goto(end_lbl.name(), self.no_position(ctx),
+                                   self.no_info(ctx))
+        stmts.append(goto_end)
+        stmts += self.add_handlers_for_inlines(ctx)
+
+        stmts.append(end_lbl)
+
     def create_inherit_check(self, method: PythonMethod, cls: PythonClass,
                              ctx: Context) -> 'silver.ast.Callable':
         """
@@ -236,12 +246,9 @@ class ProgramTranslator(CommonTranslator):
 
         stmts, end_lbl = self.inline_method(method, args, method.result,
                                             error_var, ctx)
-        goto_end = self.viper.Goto(end_lbl.name(), self.no_position(ctx),
-                                   self.no_info(ctx))
-        stmts.append(goto_end)
-        stmts += self.add_handlers_for_inlines(ctx)
 
-        stmts.append(end_lbl)
+        self._create_inherit_check_postamble(stmts, end_lbl, ctx)
+
         locals_after = set(method.locals.values())
         locals_diff = locals_after.symmetric_difference(locals_before)
         locals = [var.decl for var in locals_diff]
@@ -623,6 +630,9 @@ class ProgramTranslator(CommonTranslator):
                                        self.viper.Ref, False, pos, info, THREAD_DOMAIN)
         domain = self.viper.Domain(THREAD_DOMAIN, [get_method, get_arg, get_old], [], [],
                                    pos, info)
+        if isinstance(self.viper, ViperASTExtended):
+            self.viper.ast_extensions.SIFExtendedTransformer.addDomainFuncToDuplicate(
+                self.viper.to_seq([get_method, get_arg, get_old]))
         return domain
 
     def create_definedness_functions(self, ctx: Context) -> List['silver.ast.Function']:
@@ -712,7 +722,7 @@ class ProgramTranslator(CommonTranslator):
         """
         return eqs[0] if len(eqs) == 1 else self.viper.And(eqs[0],
                self._conjoin(eqs[1:], pos, info), pos, info)
-        
+
     def _disjoin(self, eqs: List[Expr], pos: Position, info: Info) -> Expr:
         """
         Disjoin all expressions in the list.

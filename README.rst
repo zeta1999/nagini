@@ -1,5 +1,7 @@
 
-Nagini is an automatic verifier for statically typed Python programs, based on the `Viper <http://viper.ethz.ch>`_ verification infrastructure. Our CAV 2018 tool paper describing Nagini can be found `here <http://pm.inf.ethz.ch/publications/getpdf.php?bibname=Own&id=EilersMueller18.pdf>`_. See `here <https://github.com/marcoeilers/nagini/wiki>`_ for the documentation of Nagini's specification language. 
+Nagini is an automatic verifier for statically typed Python programs, based on the `Viper <http://viper.ethz.ch>`_ verification infrastructure. Nagini is being developed at the `Chair of Programming Methodology <http://www.pm.inf.ethz.ch/>`_ at ETH Zurich as part of the `VerifiedSCION <http://www.pm.inf.ethz.ch/research/verifiedscion.html>`_ project.
+
+Our CAV 2018 tool paper describing Nagini can be found `here <http://pm.inf.ethz.ch/publications/getpdf.php?bibname=Own&id=EilersMueller18.pdf>`_. See `here <https://github.com/marcoeilers/nagini/wiki>`_ for the documentation of Nagini's specification language. 
 
 You can try a (rather slow) online version of Nagini `here <http://viper.ethz.ch/nagini-examples>`_.
 
@@ -8,7 +10,7 @@ For use with the PyCharm IDE, try the `Nagini PyCharm plugin <https://github.com
 Getting Started (Ubuntu Linux only)
 ===================================
 
-0.  Install Java 8 (64 bit), Mercurial, Git and Python 3.5 (64 bit, newer versions should work but are currently untested) and the required libraries::
+0.  Install Java 8 (64 bit), Mercurial, Git and Python 3.6 (64 bit, newer versions should work but are currently untested) and the required libraries::
 
         sudo apt-get install python3-dev libzmq3-dev
 
@@ -21,10 +23,10 @@ Getting Started (Ubuntu Linux only)
 2.  Download and extract `ViperToolsLinux <http://viper.ethz.ch/downloads/ViperToolsLinux.zip>`_ to the nagini directory
 3.  Set paths to Viper (adjust paths if necessary)::
 
-        SILICONJAR=backends\silicon.jar
-        CARBONJAR=backends\carbon.jar
-        Z3_EXE=z3\bin\z3
-        BOOGIE_EXE=boogie\Binaries\Boogie.exe
+        export SILICONJAR=backends/silicon.jar
+        export CARBONJAR=backends/carbon.jar
+        export Z3_EXE=z3/bin/z3
+        export BOOGIE_EXE=boogie/Binaries/Boogie.exe
 
 4.  Install dependencies and run tests::
 

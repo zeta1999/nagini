@@ -13,6 +13,7 @@ DEFAULT_SERVER_SOCKET = "tcp://*:5555"
 LITERALS = ['True', 'False', 'None']
 
 BUILTINS = ['cast',
+            'int',
             'isinstance',
             'bool',
             'len',
@@ -118,12 +119,14 @@ INTERNAL_NAMES = [
     COMBINED_NAME_ACCESSOR,
     COMBINED_PREFIX_ACCESSOR,
     SINGLE_NAME,
-    'm',     # used in a quantifier in measures.sil
-    'X',
+    'm',     # the following are used in various
+    'X',     # places in the resources/... files.
     'Y',
     'id',
     't',
-    'g'
+    'g',
+    'x',
+    'Low'
 ]
 
 VIPER_KEYWORDS = [
@@ -223,9 +226,11 @@ LIST_TYPE = 'list'
 
 RANGE_TYPE = 'range'
 
-SEQ_TYPE = 'Sequence'
+PSEQ_TYPE = 'PSeq'
 
 PSET_TYPE = 'PSet'
+
+PMSET_TYPE = 'PMultiset'
 
 TUPLE_TYPE = 'tuple'
 
@@ -251,16 +256,19 @@ PRIMITIVE_INT_TYPE = PRIMITIVE_PREFIX + INT_TYPE
 
 PRIMITIVE_BOOL_TYPE = PRIMITIVE_PREFIX + BOOL_TYPE
 
-PRIMITIVE_SEQ_TYPE = PRIMITIVE_PREFIX + SEQ_TYPE
+PRIMITIVE_SEQ_TYPE = PRIMITIVE_PREFIX + 'Seq'
 
 PRIMITIVE_SET_TYPE = PRIMITIVE_PREFIX + 'Set'
+
+PRIMITIVE_MSET_TYPE = PRIMITIVE_PREFIX + 'Multiset'
+
 
 OBJECT_TYPE = 'object'
 
 CALLABLE_TYPE = 'Callable'
 
 PRIMITIVES = {PRIMITIVE_INT_TYPE, PRIMITIVE_BOOL_TYPE, PRIMITIVE_SEQ_TYPE,
-              PRIMITIVE_SET_TYPE, CALLABLE_TYPE}
+              PRIMITIVE_SET_TYPE, CALLABLE_TYPE, PRIMITIVE_MSET_TYPE}
 
 BOXED_PRIMITIVES = {INT_TYPE, BOOL_TYPE}
 

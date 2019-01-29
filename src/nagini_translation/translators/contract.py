@@ -11,18 +11,17 @@ from nagini_contracts.contracts import CONTRACT_WRAPPER_FUNCS
 from nagini_translation.lib.constants import (
     BOOL_TYPE,
     BUILTIN_PREDICATES,
-    DICT_TYPE,
     GET_ARG_FUNC,
     GET_OLD_FUNC,
     GLOBAL_VAR_FIELD,
     INT_TYPE,
     JOINABLE_FUNC,
     METHOD_ID_DOMAIN,
+    PMSET_TYPE,
     PRIMITIVES,
+    PSEQ_TYPE,
     PSET_TYPE,
     RANGE_TYPE,
-    SEQ_TYPE,
-    SET_TYPE,
     THREAD_DOMAIN,
     THREAD_POST_PRED,
     THREAD_START_PRED,
@@ -33,7 +32,6 @@ from nagini_translation.lib.program_nodes import (
     PythonMethod,
     PythonModule,
     PythonType,
-    PythonVar,
     UnionType,
     toposort_classes,
     chain_cond_exp,
@@ -280,7 +278,7 @@ class ContractTranslator(CommonTranslator):
         if ctx.perm_factor:
             perm = self.viper.PermMul(perm, ctx.perm_factor, pos, info)
         pred = self.viper.FieldAccessPredicate(field_acc, perm,
-                                               pos, self.no_info(ctx))
+                                               pos, info)
         # Add type information
         if field_type.name not in PRIMITIVES:
             type_info = self.type_check(field_acc, field_type,
@@ -442,7 +440,7 @@ class ContractTranslator(CommonTranslator):
         list_field = self.viper.Field('__previous', self.viper.SeqType(self.viper.Ref),
                                       pos, info)
         field_acc = self.viper.FieldAccess(iterator, list_field, pos, info)
-        seq_type = ctx.module.global_module.classes[SEQ_TYPE]
+        seq_type = ctx.module.global_module.classes[PSEQ_TYPE]
         content_type = self.get_type(node.args[0], ctx)
         type_lit = self.type_factory.translate_type_literal(content_type, pos, ctx)
         res = self.get_function_call(seq_type, '__create__', [field_acc, type_lit],
@@ -514,6 +512,35 @@ class ContractTranslator(CommonTranslator):
         return [], self.viper.TrueLit(self.to_position(node, ctx),
                                       self.no_info(ctx))
 
+    def translate_lowval(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to the LowVal() contract function.
+        """
+        return self.translate_low(node, ctx)
+
+    def translate_lowevent(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to the LowEvent() contract function.
+        """
+        return [], self.viper.TrueLit(self.to_position(node, ctx),
+                                      self.no_info(ctx))
+
+    def translate_declassify(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to the Declassify() contract function.
+        """
+        return [self.translate_block([], self.no_position(ctx), self.no_info(ctx))], None
+
+    def translate_terminates_sif(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to the TerminatesSif() contract function.
+        """
+        cond_stmts, cond = self.translate_expr(node.args[0], ctx)
+        rank_stmts, rank = self.translate_expr(node.args[1], ctx)
+        if cond_stmts or rank_stmts:
+            raise InvalidProgramException(node, 'purity.violated')
+        return self.translator.obligation_translator._translate_must_terminate(node, ctx)
+
     def _translate_triggers(self, body: ast.AST, node: ast.Call,
                             ctx: Context) -> List['silver.ast.Trigger']:
         """
@@ -544,6 +571,9 @@ class ContractTranslator(CommonTranslator):
                         lhs_stmt, lhs = self.translate_expr(inner.left, ctx)
                         part_stmt, part, valid = self._create_quantifier_contains_expr(
                             lhs, inner.comparators[0], ctx)
+                        if part_stmt:
+                            raise InvalidProgramException(inner,
+                                                          'purity.violated')
                         if valid and not part_stmt and not lhs_stmt:
                             trigger.append(part)
                             continue
@@ -561,10 +591,13 @@ class ContractTranslator(CommonTranslator):
 
     def _create_quantifier_contains_expr(self, e: Expr,
                                          domain_node: ast.AST,
-                                         ctx: Context) -> Tuple[List[Stmt], Expr, bool]:
+                                         ctx: Context,
+                                         trigger=False) -> Tuple[List[Stmt], Expr, bool]:
         """
         Creates the left hand side of the implication in a quantifier
         expression, which says that e is an element of the given domain.
+        The last return value specifies if the returned expression is
+        recommended to be used as a trigger.
         """
         domain_old = False
         if (isinstance(domain_node, ast.Call) and
@@ -575,9 +608,17 @@ class ContractTranslator(CommonTranslator):
         pos = self.to_position(domain_node, ctx)
         info = self.no_info(ctx)
 
+        dom_target = self.get_target(domain_node, ctx)
+
+        if isinstance(dom_target, PythonType):
+            result = self.type_check(ref_var, dom_target, pos, ctx, False)
+            # Not recommended as a trigger, since it's very broad and will get triggered
+            # a lot.
+            return [], result, False
         dom_stmt, domain = self.translate_expr(domain_node, ctx)
         dom_type = self.get_type(domain_node, ctx)
-        result = self.get_quantifier_lhs(ref_var, dom_type, domain, domain_node, ctx, pos)
+        result = self.get_quantifier_lhs(ref_var, dom_type, domain, domain_node, ctx, pos,
+                                         trigger)
         if domain_old:
             result = self.viper.Old(result, pos, info)
         return dom_stmt, result, True
@@ -589,7 +630,7 @@ class ContractTranslator(CommonTranslator):
         # Use the same sequence conversion as for iterating over the
         # iterable (which gives no information about order for unordered types).
         seq_call = self.get_sequence(coll_type, arg, None, node, ctx)
-        seq_class = ctx.module.global_module.classes[SEQ_TYPE]
+        seq_class = ctx.module.global_module.classes[PSEQ_TYPE]
         if coll_type.name == RANGE_TYPE:
             type_arg = ctx.module.global_module.classes[INT_TYPE]
         else:
@@ -654,6 +695,34 @@ class ContractTranslator(CommonTranslator):
         type_lit = self.type_factory.translate_type_literal(type_arg, position,
                                                             ctx)
         result = self.get_function_call(set_type.cls, '__create__',
+                                        [result, type_lit], [None, None], node,
+                                        ctx)
+        return val_stmts, result
+
+    def translate_mset(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        mset_type = self.get_type(node, ctx)
+
+        viper_type = self.translate_type(mset_type.type_args[0], ctx)
+        val_stmts = []
+
+        if node.args:
+            vals = []
+            for arg in node.args:
+                arg_stmt, arg_val = self.translate_expr(arg, ctx,
+                    target_type = viper_type)
+                val_stmts += arg_stmt
+                vals.append(arg_val)
+            result = self.viper.ExplicitMultiset(vals, self.to_position(node, ctx),
+                                                 self.no_info(ctx))
+        else:
+            result = self.viper.EmptyMultiset(viper_type,
+                                         self.to_position(node, ctx),
+                                         self.no_info(ctx))
+        type_arg = mset_type.type_args[0]
+        position = self.to_position(node, ctx)
+        type_lit = self.type_factory.translate_type_literal(type_arg, position,
+                                                            ctx)
+        result = self.get_function_call(mset_type.cls, '__create__',
                                         [result, type_lit], [None, None], node,
                                         ctx)
         return val_stmts, result
@@ -748,16 +817,19 @@ class ContractTranslator(CommonTranslator):
         ctx.remove_alias(arg.arg)
         if body_stmt:
             raise InvalidProgramException(node, 'purity.violated')
-
         if node.func.id == 'Forall':
-            dom_stmt, lhs, is_trigger = self._create_quantifier_contains_expr(var.ref(),
+
+            dom_stmt, lhs, always_use = self._create_quantifier_contains_expr(var.ref(),
                                                                               domain_node,
                                                                               ctx)
+            if dom_stmt:
+                raise InvalidProgramException(domain_node,
+                                              'purity.violated')
             lhs = self.unwrap(lhs)
 
             implication = self.viper.Implies(lhs, rhs, self.to_position(node, ctx),
                                              self.no_info(ctx))
-            if is_trigger:
+            if always_use or not triggers:
                 # Add lhs of the implication, which the user cannot write directly
                 # in this exact form.
                 # If we always do this, we apparently deactivate the automatically
@@ -786,6 +858,7 @@ class ContractTranslator(CommonTranslator):
             implication = self.viper.Implies(var_type_check, rhs,
                                              self.to_position(node, ctx),
                                              self.no_info(ctx))
+
         forall = self.viper.Forall(variables, triggers, implication,
                                    self.to_position(node, ctx),
                                    self.no_info(ctx))
@@ -801,10 +874,12 @@ class ContractTranslator(CommonTranslator):
             return self.translate_result(node, ctx)
         elif func_name == 'RaisedException':
             return self.translate_raised_exception(node, ctx)
-        elif func_name in ('Acc', 'Rd'):
+        elif func_name in ('Acc', 'Rd', 'Wildcard'):
             if not impure:
                 raise InvalidProgramException(node, 'invalid.contract.position')
             if func_name == 'Rd':
+                perm = self.get_arp_for_context(node, ctx)
+            elif func_name == 'Wildcard':
                 perm = self.viper.WildcardPerm(self.to_position(node, ctx),
                                                self.no_info(ctx))
             else:
@@ -871,16 +946,26 @@ class ContractTranslator(CommonTranslator):
             return self.translate_unfolding(node, ctx, impure)
         elif func_name == 'Low':
             return self.translate_low(node, ctx)
+        elif func_name == 'LowVal':
+            return self.translate_lowval(node, ctx)
+        elif func_name == 'LowEvent':
+            return self.translate_lowevent(node, ctx)
+        elif func_name == 'Declassify':
+            return self.translate_declassify(node, ctx)
+        elif func_name == 'TerminatesSif':
+            return self.translate_terminates_sif(node, ctx)
         elif func_name in ('Forall', 'IOForall'):
             return self.translate_forall(node, ctx, impure)
         elif func_name == 'Previous':
             return self.translate_previous(node, ctx)
         elif func_name == 'Let':
             return self.translate_let(node, ctx, impure)
-        elif func_name == SEQ_TYPE:
+        elif func_name == PSEQ_TYPE:
             return self.translate_sequence(node, ctx)
         elif func_name == PSET_TYPE:
             return self.translate_pset(node, ctx)
+        elif func_name == PMSET_TYPE:
+            return self.translate_mset(node, ctx)
         elif func_name == 'ToSeq':
             return self.translate_to_sequence(node, ctx)
         elif func_name == 'Joinable':

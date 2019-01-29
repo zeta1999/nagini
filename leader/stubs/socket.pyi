@@ -1,5 +1,6 @@
 from typing import Optional, Tuple
 from nagini_contracts.contracts import *
+from nagini_contracts.obligations import MustTerminate
 
 AF_INET = 2
 SOCK_DGRAM = 2
@@ -12,6 +13,7 @@ class timeout(Exception):
 class socket():
 
     def __init__(self, family: int = -1, type: int = -1, proto: int = -1, fileno : object =None) -> None:
+        Requires(MustTerminate(1))
         self.family = family
         self.type = type
         Ensures(Acc(self.timeout()))
@@ -20,6 +22,7 @@ class socket():
         Ensures(self.sock() and self.peer())
 
     def settimeout(self, timeout: Optional[float]) -> None:
+        Requires(MustTerminate(1))
         Requires(Acc(self.timeout()))
         Ensures(Acc(self.timeout()))
         Ensures(self.gettimeout() is timeout)
@@ -31,9 +34,10 @@ class socket():
     @Pure
     @ContractOnly
     def gettimeout(self) -> Optional[float]:
-        Requires(Acc(self.timeout()))
+        Requires(Rd(self.timeout()))
 
     def setblocking(self, flag: bool) -> None:
+        Requires(MustTerminate(1))
         Requires(Acc(self.timeout()))
         Ensures(Acc(self.timeout()))
         Ensures(self.gettimeout() is (None if flag else 0.0))
@@ -41,7 +45,7 @@ class socket():
     @Pure
     @ContractOnly
     def getblocking(self) -> bool:
-        Requires(Acc(self.timeout()))
+        Requires(Rd(self.timeout()))
         Ensures(Result() is (self.gettimeout() is None))
 
     @Predicate
@@ -51,9 +55,10 @@ class socket():
     @Pure
     @ContractOnly
     def getsockname(self) -> Tuple[str, int]:
-        Requires(Acc(self.sock(), 1/8))
+        Requires(Rd(self.sock()))
 
     def bind(self, address: Tuple[str, int]) -> None:
+        Requires(MustTerminate(1))
         Requires(self.sock())
         Ensures(Acc(self.sock(), 1/2))
         Ensures(self.getsockname() is address)
@@ -63,6 +68,7 @@ class socket():
         return True
 
     def connect(self, address: Tuple[str, int]) -> None:
+        Requires(MustTerminate(1))
         Requires(self.peer())
         Ensures(Acc(self.peer(), 1/2))
         Ensures(self.getpeername() is address)
@@ -70,7 +76,7 @@ class socket():
     @Pure
     @ContractOnly
     def getpeername(self) -> Tuple[str, int]:
-        Requires(Acc(self.peer(), 1/8))
+        Requires(Rd(self.peer()))
 
     def recv(self, buffersize: int, flags : object = None) -> bytes:
         pass
