@@ -228,7 +228,7 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                 # type arguments. We only support that if we can get it directly
                 # from mypy, i.e., when the result is assigned to a variable
                 # and we can get the variable type.
-                if node._parent and isinstance(node._parent, ast.Assign):
+                if hasattr(node, '_parent') and node._parent and isinstance(node._parent, ast.Assign):
                     return get_type(node._parent.targets[0], containers,
                                     container)
                 elif (target.name in (SEQ_TYPE, PSET_TYPE) and

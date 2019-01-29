@@ -234,6 +234,13 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
             module_result = module.get_type(prefixes, name, previous + (self,))
             if module_result != (None, None):
                 return module_result
+        # for module_name, module in self.namespaces.items():
+        #     module_prefix = module_name.split('.')
+        #     if prefixes[:len(module_prefix)] == module_prefix:
+        #         module_result = module.get_type(prefixes[len(module_prefix):], name,
+        #                                         previous + (self,))
+        #         if module_result != (None, None):
+        #             return module_result
         return None, None
 
     def get_func_type(self, path: List[str]):

@@ -1270,9 +1270,11 @@ class Analyzer(ast.NodeVisitor):
                 return UnionType(list(set_of_types)) if len(set_of_types) > 1 else set_of_types.pop()
             if isinstance(receiver, OptionalType):
                 context = [receiver.optional_type.name]
+                module = receiver.optional_type.module
             else:
                 context = [receiver.name]
-            type, _ = self.module.get_type(context, node.attr)
+                module = receiver.module
+            type, _ = module.get_type(context, node.attr)
             return self.convert_type(type, node)
         elif isinstance(node, ast.arg):
             # Special case for cls parameter of classmethods; for those, we
