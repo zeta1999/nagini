@@ -90,7 +90,7 @@ def P(t: Place, id: int, port: int, next_host: str, next_port: int,
                     msg in s.ibuf and id < msg,
                     accept_io(t, msg, t2) and
                     P(t2, id, port, next_host, next_port, State(s.winner, s.ibuf, s.obuf + PSet(msg)))
-                )
+                ), [[msg in s.ibuf]]
             ))
             and
             # # Event reject
@@ -119,7 +119,7 @@ def P(t: Place, id: int, port: int, next_host: str, next_port: int,
                     UDP_send_int(t, next_host, next_port, msg, t6) and
                     P(t6, id, port, next_host, next_port,
                       State(s.winner, s.ibuf, s.obuf))
-                )
+                ), [[msg in s.obuf]]
             ))
         )
     )
@@ -153,6 +153,7 @@ def main(t: Place, in_host: str, in_port: int, out_host: str, out_port: int, my_
 
     s = State(s.winner, s.ibuf, s.obuf + PSet(my_id))
     Open(P(t, my_id, in_port, out_host, out_port, s))
+    Assert(to_send in s.obuf)
     t, succ = try_send_int(t, send_socket, to_send)
     while True:
         Invariant(token(t, 5) and P(t, my_id, in_port, out_host, out_port, s))

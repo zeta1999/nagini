@@ -9,7 +9,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 # pragma pylint: disable=too-many-arguments,invalid-name,unused-argument,too-many-locals
 
 
-from typing import Any, TypeVar, Generic, Callable, Type
+from typing import Any, TypeVar, Generic, Callable, List, Tuple, Type, Union
 
 
 BUILTIN_IO_OPERATIONS = (
@@ -55,7 +55,7 @@ T15 = TypeVar('T15')
 
 
 def IOForall(domain: Type[T],
-             predicate: Callable[[T], bool]) -> bool:
+             predicate: Callable[[T], Union[bool, Tuple[bool, List[List[Any]]]]]) -> bool:
     pass
 
 
