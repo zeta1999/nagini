@@ -132,7 +132,6 @@ class CallTranslator(CommonTranslator):
                                                          [None], node, ctx)
         return stmt + str_stmt, str_val
 
-
     def _translate_int(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
@@ -1118,7 +1117,7 @@ class CallTranslator(CommonTranslator):
                 receiver_class = None
                 is_predicate = target.predicate
             elif (isinstance(node.func.value, ast.Call) and
-                        get_func_name(node.func.value) == 'super'):
+                        get_func_name(node.func.value) == 'super' and not (target.cls and target.cls.name == 'dict')):
                     # Super call
                     return self._inline_call(target, node, True, 'static call',
                                              ctx)

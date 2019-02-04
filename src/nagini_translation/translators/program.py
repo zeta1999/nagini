@@ -77,7 +77,7 @@ class ProgramTranslator(CommonTranslator):
                                 self.to_position(field.node, ctx),
                                 self.no_info(ctx))
 
-    def _translate_fields(self, cls: PythonClass,
+    def _translate_fields(self, cls: PythonClass, all_names,
                           ctx: Context) -> Tuple[List['silver.ast.Field'],
                                                  List['silver.ast.Function'],
                                                  List['silver.ast.Method']]:
@@ -95,12 +95,22 @@ class ProgramTranslator(CommonTranslator):
                 fields.append(sil_field)
             elif isinstance(field, PythonMethod):
                 # This is a property
+                if cls.module is not cls.module.global_module:
+                    all_names.append(field.sil_name)
+                used_names = set()
+                self.viper.used_names = used_names
+                self.viper.used_names_sets[field.sil_name] = used_names
                 if field.overrides:
                     raise InvalidProgramException(field.node, 'invalid.override')
                 getter = self.translate_function(field, ctx)
                 functions.append(getter)
                 if field.setter:
+                    used_names = set()
+                    self.viper.used_names = used_names
+                    self.viper.used_names_sets[field.setter.sil_name] = used_names
                     setter = self.translate_method(field.setter, ctx)
+                    if cls.module is not cls.module.global_module:
+                        all_names.append(field.setter.sil_name)
                     methods.append(setter)
 
         return fields, functions, methods
@@ -232,6 +242,7 @@ class ProgramTranslator(CommonTranslator):
 
         mname = ctx.module.get_fresh_name(cls.name + '_' + method.name +
                                           '_inherit_check')
+        self.viper.used_names_sets[method.sil_name].add(mname)
         pres, posts = self.extract_contract(method, ERROR_NAME,
                                             False, ctx)
         if method.method_type == MethodType.normal:
@@ -288,6 +299,7 @@ class ProgramTranslator(CommonTranslator):
         self.bind_type_vars(method.overrides, ctx)
 
         mname = ctx.module.get_fresh_name(method.sil_name + '_override_check')
+        self.viper.used_names_sets[method.sil_name].add(mname)
         pres, posts = self.extract_contract(method.overrides, '_err',
                                             False, ctx)
         self_arg = None
@@ -563,8 +575,6 @@ class ProgramTranslator(CommonTranslator):
         names later used when computing which parts of the program to give to
         Viper.
         """
-        if not selected:
-            return
         if node.sil_name in self.viper.used_names_sets:
             used_names = self.viper.used_names_sets[node.sil_name]
         else:
@@ -786,6 +796,36 @@ class ProgramTranslator(CommonTranslator):
                                         self.viper.Bool, False, pos, info,
                                         adt.adt_domain_name)
 
+    def _create_adt_equality_axioms(self, adt: PythonClass,
+                                    adt_type: DomainType, pos: Position,
+                                    info: Info, ctx: Context) -> List[DomainAxiom]:
+        for cons in adt.all_subclasses[1:]:
+            args = self._get_adt_cons_params_use(cons, adt.name, adt_type, pos, info, ctx)
+            args_decl = self._get_adt_cons_params_decl(cons, adt.name, adt_type, pos,
+                                                       info, ctx)
+            args_2 = [self.viper.LocalVar('__' + v.name(), v.typ(), pos, info) for v in args]
+            args_decl_2 = [self.viper.LocalVarDecl('__' + v.name(), v.typ(), pos, info) for
+                           v in args_decl]
+            if len(args) > 0:
+                cons_call = self.viper.DomainFuncApp(adt.fresh(adt.adt_prefix +
+                                                     cons.name), args, adt_type,
+                                                     pos, info, adt.adt_domain_name)
+                cons_call_2 = self.viper.DomainFuncApp(adt.fresh(adt.adt_prefix +
+                                                       cons.name), args_2, adt_type,
+                                                       pos, info, adt.adt_domain_name)
+                cons_equal = self.viper.EqCmp(cons_call, cons_call_2, pos, info)
+                args_equal = [self.viper.EqCmp(first, second, pos, info)
+                              for (first, second) in zip(args, args_2)]
+                args_equal = self._conjoin(args_equal, pos, info)
+                both_equal = self.viper.EqCmp(cons_equal, args_equal, pos, info)
+                trigger = self.viper.Trigger([cons_call, cons_call_2], pos, info)
+                quant = self.viper.Forall(args_decl + args_decl_2, [trigger], both_equal,
+                                          pos, info)
+                yield self.viper.DomainAxiom(adt.fresh(adt.adt_prefix +
+                                             'equals_' + cons.name),
+                                             quant, pos, info, adt.adt_domain_name)
+
+
     def _create_adt_axiom_deconstructors_over_constructors(self, adt: PythonClass,
                                       adt_type: DomainType, pos: Position,
                                       info: Info, ctx: Context) -> List[DomainAxiom]:
@@ -801,22 +841,50 @@ class ProgramTranslator(CommonTranslator):
                 cons_call = self.viper.DomainFuncApp(adt.fresh(adt.adt_prefix +
                                                      cons.name), args, adt_type,
                                                      pos, info, adt.adt_domain_name)
-                triggers = []
-                eqs = []
+                foralls = []
                 for (arg_name, _), arg in zip(cons.fields.items(), args):
                     decons_call = self.viper.DomainFuncApp(adt.fresh(adt.adt_prefix +
                                                            cons.name + '_' + arg_name),
                                                            [cons_call], arg.typ(), pos,
                                                            info, adt.adt_domain_name)
                     eq = self.viper.EqCmp(decons_call, arg, pos, info)
-                    eqs.append(eq)
                     trigger = self.viper.Trigger([decons_call], pos, info)
-                    triggers.append(trigger)
-                body = self._conjoin(eqs, pos, info)
-                forall = self.viper.Forall(args_decl, triggers, body, pos, info)
+                    forall = self.viper.Forall(args_decl, [trigger], eq, pos, info)
+                    foralls.append(forall)
+                body = self._conjoin(foralls, pos, info)
+
                 yield self.viper.DomainAxiom(adt.fresh(adt.adt_prefix +
                                              'decons_over_cons_' + cons.name),
-                                             forall, pos, info, adt.adt_domain_name)
+                                             body, pos, info, adt.adt_domain_name)
+
+    def _create_adt_axiom_deconstructor_types(self, adt: PythonClass,
+                                              adt_type: DomainType, pos: Position,
+                                              info: Info, ctx) -> List[DomainAxiom]:
+        for cons in adt.all_subclasses[1:]:
+            arg_decl = self.viper.LocalVarDecl('_adt', adt_type, pos, info)
+            arg_val = self.viper.LocalVar('_adt', adt_type, pos, info)
+            foralls = []
+            for arg_name, arg_field in cons.fields.items():
+                if (isinstance(arg_field.type, PythonClass) and
+                        (arg_field.type.name in PRIMITIVES or arg_field.type is adt)):
+                    continue
+                arg_type = self.translate_type(arg_field.type, ctx)
+                decons_call = self.viper.DomainFuncApp(adt.fresh(adt.adt_prefix +
+                                                                 cons.name + '_' + arg_name),
+                                                       [arg_val], arg_type, pos,
+                                                       info, adt.adt_domain_name)
+
+                trigger = self.viper.Trigger([decons_call], pos, info)
+                check = self.type_check(decons_call, arg_field.type, pos, ctx, False)
+                forall = self.viper.Forall([arg_decl], [trigger], check, pos, info)
+                foralls.append(forall)
+            if not foralls:
+                continue
+            body = self._conjoin(foralls, pos, info)
+
+            yield self.viper.DomainAxiom(adt.fresh(adt.adt_prefix +
+                                                   'decons_types_' + cons.name),
+                                         body, pos, info, adt.adt_domain_name)
 
     def _create_adt_axiom_deconstructor_types(self, adt: PythonClass,
                                               adt_type: DomainType, pos: Position,
@@ -1025,12 +1093,15 @@ class ProgramTranslator(CommonTranslator):
         ## Create box function
         adt_obj_use = self.viper.LocalVar('obj', adt_type, pos, info)
         adt_obj_decl = self.viper.LocalVarDecl('obj', adt_type, pos, info)
+        adt_other_use = self.viper.LocalVar('___other', adt_type, pos, info)
+        adt_other_decl = self.viper.LocalVarDecl('___other', adt_type, pos, info)
         postconds = []
         result = self.viper.Result(self.viper.Ref, pos, info)
         postconds.append(self.type_factory.type_check(result, adt, pos, ctx))
         unbox_func = self.viper.FuncApp(adt.fresh('unbox_' + adt.adt_domain_name),
                                         [result], pos, info, adt_type)
         postconds.append(self.viper.EqCmp(unbox_func, adt_obj_use, pos, info))
+        box_func_name = adt.fresh('box_' + adt.adt_domain_name)
         for cons in adt.all_subclasses[1:]:
             is_cons_call = self.viper.DomainFuncApp(adt.fresh(adt.adt_prefix + 'is_'
                                                     + cons.name), [adt_obj_use],
@@ -1042,7 +1113,16 @@ class ProgramTranslator(CommonTranslator):
                          self.type_factory.type_domain)
             typeof_eq = self.viper.EqCmp(typeof_call, const_call, pos, info)
             postconds.append(self.viper.Implies(is_cons_call, typeof_eq, pos, info))
-        yield self.viper.Function(adt.fresh('box_' + adt.adt_domain_name),
+            other_object = self.viper.FuncApp(box_func_name, [adt_other_use], pos, info,
+                                              self.viper.Ref, [adt_other_decl])
+            other_is_result = self.viper.EqCmp(self.viper.Result(self.viper.Ref, pos, info),
+                                               other_object, pos, info)
+            args_equal = self.viper.EqCmp(adt_obj_use, adt_other_use, pos, info)
+            both_equal = self.viper.EqCmp(args_equal, other_is_result, pos, info)
+            trigger = self.viper.Trigger([other_object], pos, info)
+            quant = self.viper.Forall([adt_other_decl], [trigger], both_equal, pos, info)
+            postconds.append(quant)
+        yield self.viper.Function(box_func_name,
                                   [adt_obj_decl], self.viper.Ref, [], postconds,
                                   None, pos, info)
 
@@ -1105,6 +1185,8 @@ class ProgramTranslator(CommonTranslator):
 
             # Create domain axioms
             axioms = []
+
+            axioms.extend(self._create_adt_equality_axioms(adt, adt_type, pos, info, ctx))
 
             ## Destructors over constructors
             axioms.extend(self._create_adt_axiom_deconstructors_over_constructors(
@@ -1169,8 +1251,8 @@ class ProgramTranslator(CommonTranslator):
         functions.append(self.create_arbitrary_bool_func(ctx))
         predicates.append(self.create_may_set_predicate(ctx))
 
-        type_funcs = self.type_factory.get_default_functions(ctx)
-        type_axioms = self.type_factory.get_default_axioms(ctx)
+        type_funcs = []
+        type_axioms = []
 
         predicate_families = OrderedDict()
         static_fields = OrderedDict()
@@ -1184,6 +1266,8 @@ class ProgramTranslator(CommonTranslator):
         # List of classes that define algebraic data types
         adt_list = []
 
+        all_names = []
+
         # First iteration over all modules: translate global variables, static
         # fields, and default arguments.
         for module in modules:
@@ -1196,8 +1280,10 @@ class ProgramTranslator(CommonTranslator):
                 if cls.is_adt:
                     # Prevents fields from being generated
                     continue
+                if module is not module.global_module:
+                    all_names.append(cls.sil_name)
                 containers.append(cls)
-                f_fields, f_funcs, f_methods = self._translate_fields(cls, ctx)
+                f_fields, f_funcs, f_methods = self._translate_fields(cls, all_names, ctx)
                 fields += f_fields
                 methods += f_methods
                 functions += f_funcs
@@ -1213,12 +1299,18 @@ class ProgramTranslator(CommonTranslator):
             # Translate default args
             for container in containers:
                 for function in container.functions.values():
+                    if module is not module.global_module:
+                        all_names.append(function.sil_name)
                     self.track_dependencies(None, selected, function, ctx)
                     self.translate_default_args(function, ctx)
                 for method in container.methods.values():
+                    if module is not module.global_module:
+                        all_names.append(method.sil_name)
                     self.track_dependencies(None, selected, method, ctx)
                     self.translate_default_args(method, ctx)
                 for pred in container.predicates.values():
+                    if module is not module.global_module:
+                        all_names.append(pred.sil_name)
                     self.track_dependencies(None, selected, pred, ctx)
                     self.translate_default_args(pred, ctx)
 
@@ -1255,10 +1347,7 @@ class ProgramTranslator(CommonTranslator):
                     adt_list.append(cls)
                 old_class = ctx.current_class
                 ctx.current_class = cls
-                funcs, axioms = self.type_factory.create_type(cls, ctx)
-                type_funcs.extend(funcs)
-                if axioms:
-                    type_axioms.extend(axioms)
+
                 for func_name in cls.functions:
                     func = cls.functions[func_name]
                     if func.interface:
@@ -1266,8 +1355,8 @@ class ProgramTranslator(CommonTranslator):
                     self.track_dependencies(selected_names, selected, func, ctx)
                     functions.append(self.translate_function(func, ctx))
                     func_constants.append(self.translate_function_constant(func, ctx))
-                    if func.overrides and not (func_name in ('__str__', '__bool__') and
-                                               func.overrides.cls.name == 'object'):
+                    if func.overrides and not ((func_name in ('__str__', '__bool__') and
+                                               func.overrides.cls.name == 'object') or (func_name in ('__getitem__',) and func.overrides.cls.name == 'dict')):
                         # We allow overriding certain methods, since the basic versions
                         # in object are already minimal.
                         raise InvalidProgramException(func.node,
@@ -1287,6 +1376,8 @@ class ProgramTranslator(CommonTranslator):
                         methods.append(self.create_override_check(method, ctx))
                 for method_name in cls.static_methods:
                     method = cls.static_methods[method_name]
+                    if module is not module.global_module:
+                        all_names.append(method.sil_name)
                     threading_ids_constants.append(
                         self.translate_method_id_to_constant(method, ctx))
                     self.track_dependencies(selected_names, selected, method, ctx)
@@ -1317,7 +1408,7 @@ class ProgramTranslator(CommonTranslator):
         if not ignore_global:
             main_py_method, main_method = self.translate_main_method(modules, ctx)
             methods.append(main_method)
-            self.track_dependencies(selected_names, selected, main_py_method, ctx)
+            #self.track_dependencies(selected_names, selected, main_py_method, ctx)
 
         # Translate global variables.
         for module in modules:
@@ -1336,6 +1427,8 @@ class ProgramTranslator(CommonTranslator):
         # used with Eval.
         for module in modules:
             for operation in module.io_operations.values():
+                if module is not module.global_module:
+                    all_names.append(operation.sil_name)
                 self.track_dependencies(selected_names, selected, operation, ctx)
                 predicate, getters, checkers = self.translate_io_operation(
                     operation,
@@ -1351,27 +1444,52 @@ class ProgramTranslator(CommonTranslator):
             predicates.append(pf)
 
         all_used_names = None
-        if selected:
-            # Compute all dependencies of directly selected methods/...
-            all_used_names = list(selected_names)
-            i = 0
-            while i < len(all_used_names):
-                name = all_used_names[i]
-                to_add = set()
-                if name in self.viper.used_names_sets:
-                    to_add = self.viper.used_names_sets[name]
-                if name in self.required_names:
-                    to_add = self.required_names[name]
-                for add in to_add:
-                    if not add in all_used_names:
-                        all_used_names.append(add)
-                i += 1
+        if not selected:
+            selected_names = all_names
+            selected_names.extend(['MustTerminate', 'MustInvokeBounded', 'MustInvokeUnbounded', 'Level', '_MaySet', 'main'])
+            for cname in ['NoneType', 'object', 'Place', 'Thread', 'Exception']:
+                selected_names.append(module.global_module.classes[cname].sil_name)
+        # Compute all dependencies of directly selected methods/...
+        all_used_names = list(selected_names)
+        i = 0
+        while i < len(all_used_names):
+            name = all_used_names[i]
+            to_add = set()
+            if name in self.viper.used_names_sets:
+                to_add = self.viper.used_names_sets[name]
+            if name in self.required_names:
+                to_add = self.required_names[name]
+            for add in to_add:
+                if not add in all_used_names:
+                    all_used_names.append(add)
+            i += 1
 
-            # Filter out anything the selected part does not depend on.
-            predicates = [p for p in predicates if p.name() in all_used_names]
-            functions = [f for f in functions if f.name() in all_used_names]
-            methods = [m for m in methods if m.name() in all_used_names]
+        all_used_names = set(all_used_names)
+        # Filter out anything the selected part does not depend on.
+        predicates = [p for p in predicates if p.name() in all_used_names]
+        functions = [f for f in functions if f.name() in all_used_names]
+        methods = [m for m in methods if m.name() in all_used_names]
 
+        ctx.current_function = None
+        for module in modules:
+            ctx.module = module
+            for cls_name, cls in module.classes.items():
+                if cls_name != cls.name:
+                    # type alias
+                    continue
+                if (not cls.is_adt and all_used_names is not None
+                        and cls.sil_name not in all_used_names):
+                    continue
+                if cls.name != cls_name:
+                    continue
+                ctx.current_class = cls
+                funcs, axioms = self.type_factory.create_type(cls, all_used_names, ctx)
+                type_funcs.extend(funcs)
+                if axioms:
+                    type_axioms.extend(axioms)
+
+        type_funcs.extend(self.type_factory.get_default_functions(ctx))
+        type_axioms.extend(self.type_factory.get_default_axioms(ctx))
         domains.append(self.type_factory.create_type_domain(type_funcs,
                                                             type_axioms, ctx))
         domains.append(self.create_thread_domain(ctx))

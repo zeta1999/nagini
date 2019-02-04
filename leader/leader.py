@@ -6,7 +6,7 @@ from nagini_contracts.contracts import *
 from nagini_contracts.io_contracts import *
 from nagini_contracts.obligations import MustTerminate
 from nagini_contracts.adt import ADT
-from int_socket import send_int, receive_int, UDP_receive_int, UDP_send_int, MAX_INT
+from int_socket import CustomConnectionRefusedException, send_int, receive_int, UDP_receive_int, UDP_send_int, MAX_INT
 
 
 class LocalState(ADT):
@@ -155,8 +155,9 @@ def main(t: Place, in_host: str, in_port: int, out_host: str, out_port: int, my_
     Open(P(t, my_id, in_port, out_host, out_port, s))
     Assert(to_send in s.obuf)
     t, succ = try_send_int(t, send_socket, to_send)
+
     while True:
-        Invariant(token(t, 5) and P(t, my_id, in_port, out_host, out_port, s))
+        Invariant(token(t) and P(t, my_id, in_port, out_host, out_port, s))
         Invariant(to_send >= 0 and to_send < MAX_INT)
         Invariant(Acc(rec_socket.timeout(), 1 / 2) and Acc(rec_socket.sock(), 1 / 2))
         Invariant(Acc(rec_socket.family, 1/2) and Acc(rec_socket.type, 1/2))
@@ -171,10 +172,12 @@ def main(t: Place, in_host: str, in_port: int, out_host: str, out_port: int, my_
         Open(P(t, my_id, in_port, out_host, out_port, s))
         t, msg = try_receive_int(t, rec_socket)
         if msg is not None:
+            Assume(False)
             s = State(s.winner, s.ibuf + PSet(msg), s.obuf)
+            assert msg in s.ibuf
             Open(P(t, my_id, in_port, out_host, out_port, s))
         if msg is not None:
-            if msg == my_id:
+            if msg is my_id:
                 # YAY, I AM THE LEADER, WHAT SHOULD I DO HERE?
                 t = elect(t)
                 break
@@ -182,12 +185,12 @@ def main(t: Place, in_host: str, in_port: int, out_host: str, out_port: int, my_
                 t = accept(t, msg)
                 to_send = msg
                 s = State(s.winner, s.ibuf, s.obuf + PSet(msg))
+                Assert(to_send in s.obuf)
                 Open(P(t, my_id, in_port, out_host, out_port, s))
+            else:
+                pass
         t, success = try_send_int(t, send_socket, to_send)
-        if success:
-            Open(P(t, my_id, in_port, out_host, out_port, s))
-        else:
-            Assume(False)
+
     return t
 
 
@@ -206,7 +209,7 @@ def try_receive_int(t: Place, rec_socket: socket.socket) -> Tuple[Place, Optiona
         Ensures(Acc(rec_socket.timeout(), 1 / 2)),
         Ensures(Acc(rec_socket.type, 1 / 4) and Acc(rec_socket.family, 1 / 4)),
         Ensures(Acc(rec_socket.sock(), 1 / 4)),
-        Ensures((Result()[0] is t_post and Result()[1] is res and token(t_post)) if Result()[1] is not None else token(t, 2)),
+        Ensures((Result()[0] is t_post and Result()[1] is res and token(t_post)) if Result()[1] is not None else token(t, 2) and Result()[0] is t),
         Ensures(Implies(Result()[1] is not None, res >= 0 and res < MAX_INT))
     ))
     try:
@@ -231,15 +234,15 @@ def try_send_int(t: Place, send_socket: socket.socket, to_send: int) -> Tuple[Pl
         Requires(
             UDP_send_int(t, send_socket.getpeername()[0], send_socket.getpeername()[1],
                          to_send, t_post)),
-        Ensures(Result()[0] is t_post and token(t_post) if Result()[1] else token(t, 2)),
+        Ensures(Result()[0] is t_post and token(t_post)),
         Ensures(Acc(send_socket.type, 1 / 4) and Acc(send_socket.family, 1 / 4)),
         Ensures(Acc(send_socket.peer(), 1 / 4)),
     ))
     try:
         t_res = send_int(t, send_socket, to_send)
         return t_res, True
-    except ConnectionRefusedError as e:
-        return t, False  # TODO: give send perm back
+    except CustomConnectionRefusedException as e:
+        return e.newplace, False  # TODO: give send perm back
 
 
 # TODO: back in with global IO spec based on args.

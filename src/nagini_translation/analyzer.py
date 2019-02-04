@@ -87,14 +87,16 @@ class Analyzer(ast.NodeVisitor):
         self.modules = OrderedDict()
         self.modules[os.path.abspath(path)] = self.module
         self.asts = {}
-        self.io_operation_analyzer = IOOperationAnalyzer(
-            self, self.node_factory)
         # Are we defining an IOExists block?
         self._is_io_existential = False
         self._aliases = {}  # Dict[str, PythonBaseVar]
         self.current_loop_invariant = None
         self.selected = selected
         self.deferred_tasks = []
+
+    def initialize_io_analyzer(self) -> None:
+        self.io_operation_analyzer = IOOperationAnalyzer(
+            self, self.node_factory)
 
     @property
     def stmt_container(self):
@@ -286,6 +288,7 @@ class Analyzer(ast.NodeVisitor):
                 superclass = self.find_or_create_class(
                     if_cls['extends'], module=self.module.global_module)
                 cls.superclass = superclass
+                superclass.direct_subclasses.append(cls)
 
         for method_name in if_cls.get('methods', []):
             if_method = if_cls['methods'][method_name]
@@ -326,6 +329,8 @@ class Analyzer(ast.NodeVisitor):
             method.generic_type = if_method['generic_type']
         if if_method.get('requires'):
             method.requires = if_method['requires']
+        if cls:
+            method.requires.append(cls.name)
         cont = cls if cls else self.module.global_module
         if predicate:
             cont.predicates[method_name] = method
@@ -418,8 +423,10 @@ class Analyzer(ast.NodeVisitor):
                 break
         else:
             # Class doesn't exist yet, create it.
+            superclass = self.global_module.classes[OBJECT_TYPE] if name != OBJECT_TYPE else None
             cls = self.node_factory.create_python_class(name, module,
-                                                        self.node_factory)
+                                                        self.node_factory,
+                                                        superclass=superclass)
             module.classes[name] = cls
         return cls
 
@@ -594,7 +601,7 @@ class Analyzer(ast.NodeVisitor):
             return
         self.visited_modules.append(module)
         old_contract_only = self.contract_only
-        self.contract_only = True
+        self.contract_only = not self.selected
         old_module = self.module
         self.module = module
         self.visit_module(module)

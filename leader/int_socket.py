@@ -25,6 +25,12 @@ def UDP_receive_int(
         t_post: Place = Result()) -> bool:
     Terminates(False)
 
+class CustomConnectionRefusedException(Exception):
+    def __init__(self, t: Place, err: ConnectionRefusedError) -> None:
+        self.newplace = t
+        self.error = err
+        Ensures(Acc(self.newplace) and self.newplace is t)
+
 
 @ContractOnly
 def send_int(t1: Place, send_socket: socket.socket, to_send: int) -> Place:
@@ -44,10 +50,10 @@ def send_int(t1: Place, send_socket: socket.socket, to_send: int) -> Place:
         Ensures(Acc(send_socket.type, 1 / 4) and Acc(send_socket.family, 1 / 4)),
         Ensures(Acc(send_socket.peer(), 1 / 4)),
 
-        Exsures(ConnectionRefusedError, Result() is t1 and token(t1, 2)),
-        Exsures(ConnectionRefusedError, Acc(send_socket.type, 1 / 4) and Acc(send_socket.family, 1 / 4)),
-        Exsures(ConnectionRefusedError, Acc(send_socket.peer(), 1 / 4)),
-        Exsures(ConnectionRefusedError, UDP_send_int(t1, send_socket.getpeername()[0],
+        Exsures(CustomConnectionRefusedException, Acc(RaisedException().newplace) and RaisedException().newplace is t_post and token(t_post)),
+        Exsures(CustomConnectionRefusedException, Acc(send_socket.type, 1 / 4) and Acc(send_socket.family, 1 / 4)),
+        Exsures(CustomConnectionRefusedException, Acc(send_socket.peer(), 1 / 4)),
+        Exsures(CustomConnectionRefusedException, UDP_send_int(t1, send_socket.getpeername()[0],
                                                      send_socket.getpeername()[1],
                                                      to_send, t_post)),
     ))

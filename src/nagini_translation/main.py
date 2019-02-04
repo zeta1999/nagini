@@ -117,6 +117,8 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     with open(os.path.join(resources_path, 'preamble.index'), 'r') as file:
         analyzer.add_native_silver_builtins(json.loads(file.read()))
 
+    analyzer.initialize_io_analyzer()
+
     main_module.add_builtin_vars()
     collect_modules(analyzer, path)
     if sif:
@@ -149,12 +151,12 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
         if verbose:
             print('ARP transformation successful.')
     # Run consistency check in translated AST
-    consistency_errors = viper_ast.to_list(prog.checkTransitively())
-    for error in consistency_errors:
-        print(error.toString())
-    if consistency_errors:
-        print(prog)
-        raise ConsistencyException('consistency.error')
+    # consistency_errors = viper_ast.to_list(prog.checkTransitively())
+    # for error in consistency_errors:
+    #     print(error.toString())
+    # if consistency_errors:
+    #     print(prog)
+    #     raise ConsistencyException('consistency.error')
     return prog
 
 

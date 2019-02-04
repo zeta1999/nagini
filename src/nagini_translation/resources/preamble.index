@@ -1,4 +1,25 @@
 {
+"object": {
+    "functions": {
+        "__bool__": {
+            "args": ["object"],
+            "type": "__prim__bool",
+            "requires": ["list", "set", "dict"]
+        },
+        "__eq__": {
+            "args": ["object", "object"],
+            "type": "__prim__bool"
+        },
+        "__str__": {
+            "args": ["object"],
+            "type": "str"
+        },
+        "__cast__": {
+            "args": ["type", "object"],
+            "type": "object"
+        }
+    }
+},
 "list": {
     "methods": {
         "__init__": {
@@ -195,26 +216,6 @@
     "type_vars": 2,
     "extends": "object"
 },
-"object": {
-    "functions": {
-        "__bool__": {
-            "args": ["object"],
-            "type": "__prim__bool"
-        },
-        "__eq__": {
-            "args": ["object", "object"],
-            "type": "__prim__bool"
-        },
-        "__str__": {
-            "args": ["object"],
-            "type": "str"
-        },
-        "__cast__": {
-            "args": ["type", "object"],
-            "type": "object"
-        }
-    }
-},
 "int": {
     "functions": {
         "__bool__": {
@@ -289,6 +290,10 @@
             "args": ["float"],
             "type": "__prim__bool",
             "requires": ["int___bool__", "int___unbox__"]
+        },
+        "__int__": {
+            "args": ["float"],
+            "type": "int"
         },
         "__eq__": {
             "args": ["float", "object"],
