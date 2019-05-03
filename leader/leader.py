@@ -117,8 +117,7 @@ def P(t: Place, id: int, port: int, next_host: str, next_port: int,
                 Implies(
                     msg in s.obuf,
                     UDP_send_int(t, next_host, next_port, msg, t6) and
-                    P(t6, id, port, next_host, next_port,
-                      State(s.winner, s.ibuf, s.obuf))
+                    P(t6, id, port, next_host, next_port, s)
                 ), [[msg in s.obuf]]
             ))
         )
@@ -186,9 +185,8 @@ def main(t: Place, in_host: str, in_port: int, out_host: str, out_port: int, my_
                 Assert(to_send in s.obuf)
                 Open(P(t, my_id, in_port, out_host, out_port, s))
         else:
-            assert t is oldt
-            assert to_send in s.obuf
-            Assume(False)
+            Assert(t is oldt)
+            Assert(to_send in s.obuf)
         t, success = try_send_int(t, send_socket, to_send)
     return t
 
