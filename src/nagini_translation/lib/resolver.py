@@ -1,4 +1,5 @@
 """
+Copyright (c) 2019 ETH Zurich
 This Source Code Form is subject to the terms of the Mozilla Public
 License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -399,7 +400,7 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 return ctx.current_contract_exception
             elif node.func.id in ('Acc', 'Rd', 'Read', 'Implies', 'Forall', 'IOForall',
                                   'Exists', 'MayCreate', 'MaySet', 'Low', 'LowVal',
-                                  'LowEvent'):
+                                  'LowEvent', 'LowExit'):
                 return module.global_module.classes[BOOL_TYPE]
             elif node.func.id == 'Declassify':
                 return None

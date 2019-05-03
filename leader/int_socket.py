@@ -63,7 +63,7 @@ def send_int(t1: Place, send_socket: socket.socket, to_send: int) -> Place:
 @ContractOnly
 def receive_int(t1: Place, rec_socket: socket.socket) -> Tuple[Place, int]:
     IOExists2(int, Place)(lambda res, t_post: (
-        Requires(Acc(rec_socket.timeout(), 1/2)),
+        Requires(Acc(rec_socket.timeout(), 1/4)),
         Requires(Acc(rec_socket.type, 1 / 4) and Acc(rec_socket.family, 1 / 4)),
         Requires(Acc(rec_socket.sock(), 1 / 4)),
         Requires(Implies(not rec_socket.getblocking(), MustTerminate(2))),
@@ -73,7 +73,7 @@ def receive_int(t1: Place, rec_socket: socket.socket) -> Tuple[Place, int]:
         Requires(not rec_socket.getblocking()),
         Requires(UDP_receive_int(t1, rec_socket.getsockname()[1], res, t_post)),
 
-        Ensures(Acc(rec_socket.timeout(), 1 / 2)),
+        Ensures(Acc(rec_socket.timeout(), 1 / 4)),
         Ensures(Acc(rec_socket.type, 1 / 4) and Acc(rec_socket.family, 1 / 4)),
         Ensures(Acc(rec_socket.sock(), 1 / 4)),
         Ensures(Result()[0] is t_post and Result()[1] is res and Result()[1] >= 0 and Result()[1] < MAX_INT and token(t_post)),

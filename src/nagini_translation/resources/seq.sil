@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2019 ETH Zurich
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -9,9 +10,9 @@ function PSeq___create__(prim: Seq[Ref], cont_type: PyType): Ref
     // ugly fix for a problem of the new type system encoding, Viper cannot prove this on its own:
     ensures issubtypePSeq(typeof(result), cont_type)
     ensures PSeq___sil_seq__(result) == prim
-    ensures forall otherPrim : Seq[Ref], otherType : PyType ::
-            {PSeq___create__(otherPrim, otherType)}
-            (PSeq___create__(otherPrim, otherType) == result) == (cont_type == otherType && prim == otherPrim)
+    //ensures forall otherPrim : Seq[Ref], otherType : PyType ::
+    //        {PSeq___create__(otherPrim, otherType)}
+    //        (PSeq___create__(otherPrim, otherType) == result) == (cont_type == otherType && prim == otherPrim)
 
 function PSeq___sil_seq__(box: Ref): Seq[Ref]
     requires issubtype(typeof(box), PSeq(PSeq_arg(typeof(box), 0)))

@@ -1,4 +1,5 @@
 """
+Copyright (c) 2019 ETH Zurich
 This Source Code Form is subject to the terms of the Mozilla Public
 License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -91,6 +92,13 @@ class SIFContractTranslator(ContractTranslator):
         else:
             info = self.no_info(ctx)
         return [], self.viper.LowEvent(self.to_position(node, ctx), info)
+
+    def translate_lowexit(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to the LowExit() contract function.
+        """
+        info = self.no_info(ctx)
+        return [], self.viper.LowExit(self.to_position(node, ctx), info)
 
     def translate_declassify(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """

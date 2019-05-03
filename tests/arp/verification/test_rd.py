@@ -1,3 +1,8 @@
+# Any copyright is dedicated to the Public Domain.
+# http://creativecommons.org/publicdomain/zero/1.0/
+
+#:: IgnoreFile(silicon)(320)
+
 from nagini_contracts.contracts import *
 
 
@@ -63,7 +68,6 @@ class Clazz:
         self.m1_3()
         Assert(self.y == 6 and self.x == 5)
         self.y = 1
-        #:: UnexpectedOutput(silicon)(call.precondition:insufficient.permission, 320)
         self.m1_4()
         Assert(self.y == 6 and self.x == 5)
         self.y = 1

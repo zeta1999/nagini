@@ -1,4 +1,5 @@
 """
+Copyright (c) 2019 ETH Zurich
 This Source Code Form is subject to the terms of the Mozilla Public
 License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -89,6 +90,9 @@ class ViperASTExtended(ViperAST):
 
     def LowEvent(self, position: Position, info: Info):
         return self.ast_extensions.SIFLowEventExp(position, info, self.NoTrafos)
+
+    def LowExit(self, position: Position, info: Info):
+        return self.ast_extensions.SIFLowExitExp(position, info, self.NoTrafos)
 
     def Declassify(self, expr: Expr, position: Position, info: Info):
         return self.ast_extensions.SIFDeclassifyStmt(expr, position, info, self.NoTrafos)

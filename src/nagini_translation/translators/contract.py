@@ -1,4 +1,5 @@
 """
+Copyright (c) 2019 ETH Zurich
 This Source Code Form is subject to the terms of the Mozilla Public
 License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -525,6 +526,13 @@ class ContractTranslator(CommonTranslator):
         return [], self.viper.TrueLit(self.to_position(node, ctx),
                                       self.no_info(ctx))
 
+    def translate_lowexit(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to the LowExit() contract function.
+        """
+        return [], self.viper.TrueLit(self.to_position(node, ctx),
+                                      self.no_info(ctx))
+
     def translate_declassify(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to the Declassify() contract function.
@@ -950,6 +958,8 @@ class ContractTranslator(CommonTranslator):
             return self.translate_lowval(node, ctx)
         elif func_name == 'LowEvent':
             return self.translate_lowevent(node, ctx)
+        elif func_name == 'LowExit':
+            return self.translate_lowexit(node, ctx)
         elif func_name == 'Declassify':
             return self.translate_declassify(node, ctx)
         elif func_name == 'TerminatesSif':

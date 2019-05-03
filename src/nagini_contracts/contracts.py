@@ -1,4 +1,5 @@
 """
+Copyright (c) 2019 ETH Zurich
 This Source Code Form is subject to the terms of the Mozilla Public
 License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -29,7 +30,7 @@ CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall', 'IOF
                   'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding', 'Previous',
                   'RaisedException', 'PSeq', 'PSet', 'ToSeq', 'MaySet', 'MayCreate',
                   'getMethod', 'getArg', 'getOld', 'arg', 'Joinable', 'MayStart', 'Let',
-                  'PMultiset',]
+                  'PMultiset', 'LowExit',]
 
 T = TypeVar('T')
 V = TypeVar('V')
@@ -86,7 +87,7 @@ def Let(e1: T, t: Type[V], e2: Callable[[T], V]) -> V:
     """
     pass
 
-def Forall(domain: Union[Iterable[T], Type[T]],
+def Forall(domain: 'Union[Iterable[T], Type[T]]',
            predicate: Callable[[T], Union[bool, Tuple[bool, List[List[Any]]]]]) -> bool:
     """
     forall x in domain: predicate(x)
@@ -118,6 +119,13 @@ def LowVal(expr: T) -> bool:
 def LowEvent() -> bool:
     """
     Predicate that states that either both executions reach this point or none of them.
+    """
+    pass
+
+def LowExit() -> bool:
+    """
+    Predicate that states that whether the current loop has been left via a break or
+    return statement does not depend on high data.
     """
     pass
 
@@ -458,6 +466,7 @@ __all__ = [
         'Low',
         'LowVal',
         'LowEvent',
+        'LowExit',
         'Declassify',
         'TerminatesSif',
         'AllLow',

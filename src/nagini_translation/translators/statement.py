@@ -1,4 +1,5 @@
 """
+Copyright (c) 2019 ETH Zurich
 This Source Code Form is subject to the terms of the Mozilla Public
 License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -743,7 +744,6 @@ class StatementTranslator(CommonTranslator):
         # Remember type information about havocked local variables.
         invariant.extend(self._get_havocked_var_type_info(node.body[start:end],
                                                           ctx))
-
 
         for expr, aliases in ctx.actual_function.loop_invariants[node]:
             with ctx.additional_aliases(aliases):

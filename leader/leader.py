@@ -168,15 +168,13 @@ def main(t: Place, in_host: str, in_port: int, out_host: str, out_port: int, my_
         Invariant(not rec_socket.getblocking() and rec_socket.getsockname()[1] is in_port)
         Invariant(send_socket.getpeername()[0] is out_host and send_socket.getpeername()[1] is out_port)
         Invariant(to_send in s.obuf and to_send >= my_id)
-
+        oldt = t
         Open(P(t, my_id, in_port, out_host, out_port, s))
         t, msg = try_receive_int(t, rec_socket)
         if msg is not None:
-            Assume(False)
             s = State(s.winner, s.ibuf + PSet(msg), s.obuf)
             assert msg in s.ibuf
             Open(P(t, my_id, in_port, out_host, out_port, s))
-        if msg is not None:
             if msg is my_id:
                 # YAY, I AM THE LEADER, WHAT SHOULD I DO HERE?
                 t = elect(t)
@@ -187,16 +185,17 @@ def main(t: Place, in_host: str, in_port: int, out_host: str, out_port: int, my_
                 s = State(s.winner, s.ibuf, s.obuf + PSet(msg))
                 Assert(to_send in s.obuf)
                 Open(P(t, my_id, in_port, out_host, out_port, s))
-            else:
-                pass
+        else:
+            assert t is oldt
+            assert to_send in s.obuf
+            Assume(False)
         t, success = try_send_int(t, send_socket, to_send)
-
     return t
 
 
 def try_receive_int(t: Place, rec_socket: socket.socket) -> Tuple[Place, Optional[int]]:
     IOExists2(int, Place)(lambda res, t_post: (
-        Requires(Acc(rec_socket.timeout(), 1 / 2)),
+        Requires(Acc(rec_socket.timeout(), 1 / 3)),
         Requires(Acc(rec_socket.type, 1 / 4) and Acc(rec_socket.family, 1 / 4)),
         Requires(Acc(rec_socket.sock(), 1 / 4)),
         Requires(Implies(not rec_socket.getblocking(), MustTerminate(3))),
@@ -206,7 +205,7 @@ def try_receive_int(t: Place, rec_socket: socket.socket) -> Tuple[Place, Optiona
         Requires(not rec_socket.getblocking()),
         Requires(
             UDP_receive_int(t, rec_socket.getsockname()[1], res, t_post)),
-        Ensures(Acc(rec_socket.timeout(), 1 / 2)),
+        Ensures(Acc(rec_socket.timeout(), 1 / 3)),
         Ensures(Acc(rec_socket.type, 1 / 4) and Acc(rec_socket.family, 1 / 4)),
         Ensures(Acc(rec_socket.sock(), 1 / 4)),
         Ensures((Result()[0] is t_post and Result()[1] is res and token(t_post)) if Result()[1] is not None else token(t, 2) and Result()[0] is t),

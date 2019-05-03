@@ -1,4 +1,5 @@
 """
+Copyright (c) 2019 ETH Zurich
 This Source Code Form is subject to the terms of the Mozilla Public
 License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -908,6 +909,11 @@ class Analyzer(ast.NodeVisitor):
         if isinstance(node.func, ast.Name) and node.func.id == 'LowEvent':
             preconditions = list(map(lambda tuple: tuple[0], self.stmt_container.precondition))
             if not contains_stmt(preconditions, node):
+                raise InvalidProgramException(node, 'invalid.contract.position')
+        if isinstance(node.func, ast.Name) and node.func.id == 'LowExit':
+            preconditions = list(map(lambda tuple: tuple[0], self.stmt_container.precondition))
+            postconditions = list(map(lambda tuple: tuple[0], self.stmt_container.postcondition))
+            if contains_stmt(preconditions, node) or contains_stmt(postconditions, node):
                 raise InvalidProgramException(node, 'invalid.contract.position')
         self.visit_default(node)
 

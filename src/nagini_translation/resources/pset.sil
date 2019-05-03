@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2019 ETH Zurich
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -7,9 +8,9 @@
 function PSet___create__(prim: Set[Ref], cont_type: PyType): Ref
     ensures typeof(result) == PSet(cont_type)
     ensures PSet___unbox__(result) == prim
-    ensures forall otherPrim : Set[Ref], otherType : PyType ::
-            {PSet___create__(otherPrim, otherType)}
-            (PSet___create__(otherPrim, otherType) == result) == (cont_type == otherType && prim == otherPrim)
+    //ensures forall otherPrim : Set[Ref], otherType : PyType ::
+    //        {PSet___create__(otherPrim, otherType)}
+    //        (PSet___create__(otherPrim, otherType) == result) == (cont_type == otherType && prim == otherPrim)
 
 function PSet___unbox__(box: Ref): Set[Ref]
     requires issubtypePSet(typeof(box), PSet_arg(typeof(box), 0))
