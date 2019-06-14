@@ -121,13 +121,17 @@ class Opener:
             self._define_existential_variables()
             self._ctx.inlined_calls.append(self._operation)
             body = self._translate_body()
-            for alias in reversed(list(self._io_ctx._open_var_aliases)):
+            alias_definitions = dict(self._io_ctx._open_var_alias_definitions)
+            for alias in self._io_ctx._open_var_aliases:
                 ref = self._io_ctx._open_var_aliases[alias].ref()
-                replacement = self._io_ctx._open_var_alias_definitions[alias]
+                replacement = alias_definitions[alias]
                 body = body.replace(ref, replacement)
+                for other_alias in self._io_ctx._open_var_alias_definitions:
+                    if alias == other_alias:
+                        continue
+                    alias_definitions[other_alias] = alias_definitions[other_alias].replace(ref, replacement)
+
             self._ctx.inlined_calls.pop()
-        # statements = self._emit_existential_variable_definitions()
-        # statements.append(self._emit_body_inhale(body))
         return [self._emit_body_inhale(body)]
 
     def _define_existential_variables(self) -> None:
