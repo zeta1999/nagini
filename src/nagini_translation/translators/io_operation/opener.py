@@ -11,6 +11,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import ast
 
 from typing import cast, List
+from collections import OrderedDict
 
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.io_context import IOOpenContext
@@ -120,7 +121,7 @@ class Opener:
             self._define_existential_variables()
             self._ctx.inlined_calls.append(self._operation)
             body = self._translate_body()
-            for alias in self._io_ctx._open_var_aliases:
+            for alias in reversed(list(self._io_ctx._open_var_aliases)):
                 ref = self._io_ctx._open_var_aliases[alias].ref()
                 replacement = self._io_ctx._open_var_alias_definitions[alias]
                 body = body.replace(ref, replacement)
@@ -135,7 +136,7 @@ class Opener:
         Make sure that they have fresh silver names. Add them to the
         context and variable aliases.
         """
-        io_existential_vars = dict(
+        io_existential_vars = OrderedDict(
             (creator.name, creator.create_variable_instance())
             for creator in self._operation.get_io_existentials()
         )

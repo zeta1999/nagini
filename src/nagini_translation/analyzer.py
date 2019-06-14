@@ -804,8 +804,6 @@ class Analyzer(ast.NodeVisitor):
             # b/c primitive equality is simpler than boxed reference equality,
             # and for simplicity we use the same policy for output params too.
             if self._is_io_existential:
-                if isinstance(node._parent, ast.Call):
-                    print("12")
                 arg_type = self.typeof(arg).try_unbox()
                 var = self.node_factory.create_python_io_existential_var(
                     arg.arg, arg, arg_type)

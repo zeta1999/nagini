@@ -60,6 +60,10 @@ def IOForall(domain: Type[T],
     pass
 
 
+def IOExists(domain: Type[T]) -> Callable[[Callable[[T], bool]], bool]:
+    pass
+
+
 class IOExists1(Generic[T1]):
     """``IOExists`` for defining 1 IO existential variable."""
 
@@ -435,6 +439,7 @@ def ctoken(t: Place) -> bool:
 
 __all__ = (
     'IOForall',
+    'IOExists',
     'IOExists1',
     'IOExists2',
     'IOExists3',

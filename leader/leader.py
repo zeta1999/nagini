@@ -78,18 +78,21 @@ def elect(t_pre: Place) -> Place:
 def P(t: Place, id: int, port: int, next_host: str, next_port: int,
       s: State) -> bool:
     Terminates(False)
-    return IOExists6(Place, Place, Place, int, Place, Place)(
-        lambda t1, t2, t4, rres, t5, t6: (
+    return IOExists4(Place, int, Place, Place)(
+        lambda t4, rres, t5, t6: (
             # Event set_up_init
-            set_up_init_io(t, t1) and
-            P(t1, id, port, next_host, next_port, State(s.winner, s.ibuf, s.obuf + PSet(id)))
+            IOExists(Place)(lambda t1: set_up_init_io(t, t1) and
+            P(t1, id, port, next_host, next_port, State(s.winner, s.ibuf, s.obuf + PSet(id))))
             and
             # Event accept
             IOForall(int, lambda msg: (
-                Implies(
-                    msg in s.ibuf and id < msg,
-                    accept_io(t, msg, t2) and
-                    P(t2, id, port, next_host, next_port, State(s.winner, s.ibuf, s.obuf + PSet(msg)))
+                IOExists(Place)(lambda t2:
+                                Implies(
+                                    msg in s.ibuf and id < msg,
+                                    accept_io(t, msg, t2) and
+                                    P(t2, id, port, next_host, next_port,
+                                      State(s.winner, s.ibuf, s.obuf + PSet(msg)))
+                                )
                 ), [[msg in s.ibuf]]
             ))
             and

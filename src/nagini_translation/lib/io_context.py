@@ -23,7 +23,7 @@ class IOOpenContext:
         self._is_opening = False
         """Are we currently translating IO open?"""
 
-        self._open_var_aliases = {}  # type: Dict[str, PythonVar]
+        self._open_var_aliases = OrderedDict()  # type: Dict[str, PythonVar]
         """Variables used while opening IO operation."""
 
         self._open_var_alias_definitions = OrderedDict()

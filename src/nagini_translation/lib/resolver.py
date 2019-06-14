@@ -65,6 +65,11 @@ def get_target(node: ast.AST,
         return find_entry(node.s, True, containers)
     elif isinstance(node, ast.Call):
         # For calls, we return the type of the result of the call
+        if isinstance(node.func, ast.Call):
+            if get_func_name(node.func) == 'IOExists':
+                module = next(cont for cont in containers
+                              if isinstance(cont, PythonModule))
+                return module.global_module.classes[BOOL_TYPE]
         func_name = get_func_name(node)
         if (container and func_name == 'Result' and
                 isinstance(container, PythonMethod)):
