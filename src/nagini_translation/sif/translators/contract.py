@@ -11,6 +11,7 @@ from nagini_translation.lib.constants import (
     BOOL_TYPE,
     FLOAT_TYPE,
     INT_TYPE,
+    LIST_TYPE,
     PSET_TYPE,
     PSEQ_TYPE,
     STRING_TYPE,
@@ -75,6 +76,13 @@ class SIFContractTranslator(ContractTranslator):
         if expr_type.name in low_val_types:
             comparator = expr_type.get_function('__eq__')
             comparator = comparator.sil_name
+        elif expr_type.name == LIST_TYPE:
+            comparator = None
+            pos = self.to_position(node, ctx)
+            info = self.no_info(ctx)
+            field = self.viper.Field('list_acc', self.viper.SeqType(self.viper.Ref),
+                                     pos, info)
+            expr = self.viper.FieldAccess(expr, field, pos, info)
         else:
             comparator = None
         return [], self.viper.Low(
