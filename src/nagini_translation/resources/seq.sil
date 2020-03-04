@@ -43,6 +43,7 @@ function PSeq_drop(self: Ref, no: Int): Ref
 
 function PSeq_update(self: Ref, index: Int, val: Ref): Ref
     requires issubtypePSeq(typeof(self), PSeq_arg(typeof(self), 0))
+    requires index >= 0 && index < PSeq___len__(self)
     ensures result == PSeq___create__(PSeq___sil_seq__(self)[index := val], PSeq_arg(typeof(self), 0))
 
 function PSeq___add__(self: Ref, other: Ref): Ref
